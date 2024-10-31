@@ -1,0 +1,63 @@
+<style>
+	@media print {
+		.print-hidden {
+			display: none;
+		}
+		.company_link:link:after, .company_link:visited:after {
+			content: none;
+		}
+	}
+	@media (max-width: 480px){
+		.main_contents {
+			padding: 0 15px!important;
+		}
+		.gift_amount{
+			font-size: 35px!important;
+		}
+	}
+</style>
+
+<div style="background-color: #c0dfe6; max-width: 700px; margin: 0 auto; padding: 0 0 25px; text-align: center;">
+	<a style="pointer-events: none;" href="#"><img style="max-width: 100%;" src="[company_link]/cards/special/05_image.png" alt="Special Gift for you" /></a>
+    <div class="main_contents" style="padding: 0 50px;">
+        <div class="amount_box" style="box-sizing: border-box; background: #fff; margin: 0 auto 50px; padding: 25px 15px 30px; text-align: center; width: 100%; max-width: 500px; border-radius: 10px; box-shadow: 0 3px 1px rgba(128,187,198,0.35);">
+            <h1 style="margin: 0 0 30px; text-align: center; font-size: 1em;">
+                <img src="[company_link]/cards/special/05_title.png" alt="GIFT CARD" width="144" />
+            </h1>
+            <p class="gift_amount" style="color: #000; font-size: 50px; margin: 0;">[amount]</p>
+            <p style="color: rgba(0,0,0,0.8); font-size: 14px; margin: 0; padding: 10px 0 20px;">Card number : [card_number]</p>
+			[if:card_expiry]
+			<p style="color: rgba(0,0,0,0.8); font-size: 13px; padding: 0 0 20px;">Expiry date : [card_expiry]</p>
+			[endif]
+            <p class="print-hidden">
+                <a class="btn" style="background: #f63939; border-radius: 20px 0 20px 20px; color: #fff; display: inline-block; font-size: 16px; font-weight: bold; line-height: 1; padding: 12px 20px; text-transform: uppercase; text-decoration: none;max-width: 300px;"" href="[card_link]">
+                    View Gift Card Online
+                </a>
+            </p>
+        </div>
+        <div class="message_box" style="box-sizing: border-box; margin: 0 auto; line-height: 2.6em;">
+            <p style="color: #000; font-size: 17px; margin: 0; text-align: left;">Hi [first_name] [last_name],</p>
+			[if:gifted_item]
+			<div style="text-align:left; padding: 5px 0 20px; line-height:1.6;">
+				<p style="color: #000; font-size: 17px; margin: 0;  margin-block-start: 0; margin-block-end: 0; text-align: left">
+					You have been gifted [gifted_item] ([gifted_group])</p>
+				<p style="color: #000; font-size: 17px; margin: 0;  margin-block-start: 0; margin-block-end: 0; text-align: left">
+					You can book your gift <a href="[gifted_link]">here.</a> <br /></p>
+			</div>
+			[endif]
+            <p style="color: #000; font-size: 17px; margin: 0; text-align: left;">[card_message]</p>
+
+			<p style="color: #000; font-size: 16px; margin: 20px 0 40px; text-align: left;">
+				From [card_sender]
+			</p>
+					
+        </div>
+        
+        <h2 style="color: #005e6d; font-size: 14px; margin: 0 0 5px; text-align: left;">How to redeem your Gift Card online</h2>
+        
+        <ul style="color: #005e6d; font-size: 14px; list-style: decimal; margin: 0 0 40px; padding: 0 0 0 20px; text-align: left;">
+            <li style="padding: 0 0 5px 5px">Visit <a class="company_link" href="[company_link]" target="_blank" style="color: #005e6d;">[company_link]</a></li>
+            <li style="padding: 0 0 5px 5px">During checkout, enter the card number at the payment step.</li>
+        </ul>
+    </div>
+</div>

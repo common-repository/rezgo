@@ -1,0 +1,122 @@
+/* Rezgo responsive calendar */
+.responsive-calendar {
+	font-family: var(--kumbh);
+	padding: 7% 5% 5%;
+	background:#eee;
+	border-radius: 6px;
+	border-bottom-left-radius: 0;
+	border-bottom-right-radius: 0;
+}
+.responsive-calendar .controls {
+	text-align: center;
+}
+.responsive-calendar .controls h4{
+	display: inline;
+	font-weight: var(--font-heaviest);
+}
+.responsive-calendar .day-headers,
+.responsive-calendar .days {
+	font-size: 0;
+}
+.responsive-calendar .controls a {
+	cursor: pointer;
+    font-size: 16px;
+	color: #999;
+}
+.responsive-calendar .day-headers {
+	height:20px;
+	margin-top:20px;
+}
+.responsive-calendar .day {
+    display: inline-flex;
+    position: relative;
+    width: 14.285714285714286%;
+    text-align: center;
+    font-size: 13px;
+    align-items: center;
+    justify-content: center;
+}
+.responsive-calendar .day .badge {
+	position: absolute;
+	top: 2px;
+	right: 2px;
+	z-index: 1;
+}
+.responsive-calendar .day.header {
+	border-bottom: 1px gray solid;
+}
+.responsive-calendar .day a {
+	color: #000000;
+	display: block;
+	cursor: pointer;
+	width: 42.5px;
+    height: 42.5px;
+    line-height: 42.5px;
+}
+.responsive-calendar .day a:hover {
+	background-color: #eee;
+	text-decoration: none;
+}
+.responsive-calendar .day.active a {
+	border-radius: 40px;
+	background-color: #0D4191;
+	color: #ffffff;
+	transition: 0.1s ease;
+}
+.responsive-calendar .day.active a:hover {
+	background-color:#449d44 ;
+}
+.responsive-calendar .day.active a:hover,
+.responsive-calendar .day.select a {
+	background-color:#398439;
+}
+.responsive-calendar .day.active .not-current {
+	background-color: #8fcaef;
+	color: #ffffff;
+}
+.responsive-calendar .day.active .not-current:hover {
+	background-color: #bcdff5;
+}
+.responsive-calendar .day.select:after{
+	background-color: #449d44;
+}
+.responsive-calendar .day.select a:hover {
+	background-color:#449d44;
+}
+.responsive-calendar .day.not-current a {
+	color: #ddd;
+	cursor: default;
+}
+.responsive-calendar .day.available a {
+  background-color: #090;
+}
+.responsive-calendar .day:not(.active) a,
+.responsive-calendar .day.past a,
+.responsive-calendar .day.passed a,
+.responsive-calendar .day.cutoff a,
+.responsive-calendar .day.unavailable a {
+	cursor: none;
+	pointer-events: none;
+	border-radius: 40px;
+}
+.responsive-calendar .day.full a {
+    background-color: #FF9900;
+	border-radius: 40px;
+	color: #FFFFFF;
+	cursor: default;
+}
+@media (max-width:480px) {
+	.responsive-calendar .day a {
+		width: 38px; 
+		height: 38px;
+		line-height: 38px;
+	}
+}
+@media (max-width:360px) {
+	.responsive-calendar .day a {
+		width: 30px;
+		height: 30px;
+		line-height: 30px;
+		font-size: 12px;
+	}
+}

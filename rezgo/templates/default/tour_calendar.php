@@ -1,0 +1,562 @@
+<?php if (!REZGO_WORDPRESS) { ?>
+<!-- fonts -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:300,400,700">
+<!-- calendar.css -->
+<link href="<?php echo $this->path; ?>/css/responsive-calendar.css" rel="stylesheet">
+<link href="<?php echo $this->path; ?>/css/responsive-calendar.rezgo.css?v=<?php echo REZGO_VERSION; ?>" rel="stylesheet">
+
+<script type="text/javascript" src="<?php echo $this->path; ?>/js/responsive-calendar.min.js"></script>
+<?php } ?>
+<div class="tour-details-wrp container-fluid rezgo-container">
+
+<?php
+// setup calendar start days
+$company = $site->getCompanyDetails();
+$date_format = $company->date_format;
+$time_format = $company->time_format;
+$request_timestamp = strtotime(sanitize_text_field($_REQUEST['date']));
+$use_date = FALSE;
+$use_opened_day = TRUE;
+$date_search = '';
+$item_cutoff = 0;
+	
+$com = sanitize_text_field($_REQUEST['com']);
+$option = sanitize_text_field($_REQUEST['option']);
+$wp_slug = sanitize_text_field($_REQUEST['wp_slug']);
+	
+$items_check = $site->getTours('t=com&q='.$com.'&f[uid]='.$option);
+
+if (!empty($items_check)) {
+	
+	foreach ($items_check as $check) {
+		
+		if ((int) $check->cutoff > $item_cutoff) {
+			$item_cutoff = (string) $check->cutoff;
+		}
+		
+		if ( (string) $check->date_selection == 'days' || (string) $check->date_selection == 'week' ) { 
+			$use_opened_day = FALSE; 
+		}
+		
+		if ( (string) $check->availability_type == 'open' || (string) $check->availability_type == '' || (string) $check->date_selection == 'days' || (string) $check->date_selection == 'week' ) { 
+			continue; 
+		}
+		
+		if ($request_timestamp >= (int) $check->start_date && $request_timestamp <= (int) $check->end_date) {
+			$use_date = TRUE;
+			break;
+		}
+		
+	}
+}
+
+$adjusted_timestamp = strtotime('+'.($item_cutoff + $company->time_format).' hours');
+
+if ($_REQUEST['date'] == 'open') {
+	unset($_REQUEST['date']);
+}
+
+// adjust date if requested date falls within cutoff
+if ($adjusted_timestamp > $request_timestamp) {
+	$request_timestamp = $adjusted_timestamp;
+}
+
+if ($use_date) {
+	$date_search = date('Y-m-d', $request_timestamp);
+}
+
+$items = $site->getTours('t=com&q='.$com.'&f[uid]='.$option.'&d='.$date_search);
+
+if(!$items) {
+	// try new date if cart date not available
+	$date_retry = date('Y-m-d', $adjusted_timestamp);
+	$use_opened_day = FALSE; 
+	$items = $site->getTours('t=com&q='.$com.'&f[uid]='.$option.'&d='.$date_retry);
+}
+
+if(!$items) { ?>
+  
+  <div class="row">
+    <div class="col-12">
+      <h3 class="rezgo-return-head"><?php echo stripslashes(esc_html($_REQUEST['name'] ?? '')) ?></h3>
+      <p class="lead">This item is not currently available or has no available options.</p>
+    </div>
+  </div>
+  
+<?php } else { ?>
+	<?php 
+	function date_sort($a, $b) {
+		if ($a['start_date'] == $b['start_date']) {
+				return 0;
+		}
+		return ($a['start_date'] < $b['start_date']) ? -1 : 1;
+	}
+
+	function recursive_array_search($needle,$haystack) {
+		foreach($haystack as $key=>$value) {
+				$current_key=$key;
+				if($needle===$value OR (is_array($value) && recursive_array_search($needle,$value) !== false)) {
+					return $current_key;
+				}
+		}
+		return false;
+	}	
+
+	$day_options = array();
+	$single_dates = 0;
+	$calendar_dates = 0;
+	$open_dates = 0;
+
+	foreach($items as $item) {
+		$site->readItem($item);
+		
+		$day_start = (int) $item->start_date;
+		
+		if (recursive_array_search($day_start, $day_options) === FALSE) {
+			$day_options[(int) $item->uid]['start_date'] = $day_start;
+		}
+		
+		// calendar availability types
+		$calendar_selects = array('always', 'range', 'week', 'days');
+		
+		// open availability types
+		$open_selects = array('never', 'number', 'specific');
+		
+		$date_selection = (string) $item->date_selection;
+		
+		// get option availability types (single, open or calendar)
+		if ($date_selection == 'single') { 
+			$single_dates++; 
+		} elseif (in_array($date_selection, $open_selects)) { 
+			$open_dates++; 
+		} elseif (in_array($date_selection, $calendar_selects)) { 
+			$calendar_dates++; 
+		}
+		
+	}
+
+	// resort by date
+	usort($day_options, 'date_sort'); 
+
+	// set defaults for start of availability
+	$start_day = date('j', strtotime('+'.($item_cutoff + $company->time_format).' hours'));
+	$open_cal_day = date('Y-m-d', strtotime('+'.($item_cutoff + $company->time_format).' hours'));
+
+	// get the available dates
+	$site->getCalendar($item->uid, sanitize_text_field($_REQUEST['date'])); 
+
+	$cal_day_set = FALSE;
+	$calendar_events = '';
+
+	foreach($site->getCalendarDays() as $day) {
+
+		if (property_exists($day, 'cond')) {
+			if ($day->cond == 'a') { $class = ''; } // available
+			elseif ($day->cond == 'p') { $class = 'passed'; }
+			elseif ($day->cond == 'f') { $class = 'full'; }
+			elseif ($day->cond == 'i' || $day->cond == 'u') { $class = 'unavailable'; }
+			elseif ($day->cond == 'c') { $class = 'cutoff'; }
+			
+			if ($day->date) { // && (int)$day->lead != 1
+				$calendar_events .= '"'.esc_html(date('Y-m-d', $day->date)).'":{"class": "'.esc_html($class).'"},';
+			}
+			
+			if ($_REQUEST['date']) {
+				//$request_date = strtotime($_REQUEST['date']);
+				$calendar_start = date('Y-m', $request_timestamp);
+				$start_day =	date('j', $request_timestamp);
+				if ($use_opened_day) {
+					$open_cal_day =	date('Y-m-d', $request_timestamp);
+					$cal_day_set = TRUE;
+				}
+			} else {
+				if ($day->date) {
+					$calendar_start = date('Y-m', (int) $day->date);
+				}
+				// redefine start days
+				if ($day->cond == 'a' && !$cal_day_set) { 
+					$start_day =	date('j', $day->date);
+					$open_cal_day =	date('Y-m-d', $day->date);
+					$cal_day_set = TRUE;
+				} 
+			}
+		}
+	}
+	$calendar_events = trim($calendar_events, ','."\n");
+	?>
+
+	<div class="row">
+		
+		<div class="col-12">	
+    
+    	<h3 class="rezgo-return-head"><?php echo esc_html($item->item); ?></h3>
+      <div class="clearfix" id="rezgo-cross-cal-top">&nbsp;</div> <!--  style="height:0;" -->
+      
+			<?php if ((int) $open_dates > 0) { ?>
+				<div class="rezgo-calendar-wrp">
+					<div class="rezgo-calendar-header-empty">&nbsp;</div>
+					<div class="rezgo-open-container">
+						<?php $open_date = date('Y-m-d', strtotime('+1 day')); ?>
+					
+						<div class="rezgo-open-options cross-sell_add-border" id="rezgo-open-option-<?php echo esc_attr($opt); ?>" style="display:none;">
+							<div class="rezgo-open-selector" id="rezgo-open-date-<?php echo esc_attr($opt); ?>"></div>
+
+							<script type="text/javascript">						
+								jQuery$(document).ready(function($){
+									$.ajax({
+										url: '<?php echo admin_url('admin-ajax.php'); ?>',
+										data: {
+											action: 'rezgo',
+											method: 'calendar_day',
+											parent_url: '<?php echo esc_html($site->base); ?>',
+											com: '<?php echo esc_html($item->com); ?>',
+											date: '<?php echo esc_html($open_date); ?>',
+											type: 'open',
+											<?php if ($_REQUEST['view'] != 'calendar') { ?>
+											cross_sell: 1,
+											<?php } ?>
+											wp_slug: '<?php echo esc_html($wp_slug); ?>',
+											security: '<?php echo wp_create_nonce('rezgo-nonce'); ?>'
+										},
+										context: document.body,
+										success: function(data) {
+											if (data.indexOf('rezgo-order-none-available') == -1) {
+												$('#rezgo-open-date-<?php echo esc_html($opt); ?>').html(data).slideDown('fast');
+												$('#rezgo-open-option-<?php echo esc_html($opt); ?>').fadeIn('fast');
+											}										
+											
+										}
+									});
+								});
+							</script> 
+						</div>
+					
+						<div id="rezgo-open-memo"></div>
+					</div>
+				</div>
+			<?php } // end if $open_dates > 0 ?>
+
+			<?php if ( $calendar_dates > 0 || $single_dates > 10 ) { ?>
+				<div class="hidden visible-xs">
+					<span>&nbsp;</span>
+				</div>
+
+				<div class="rezgo-calendar-wrp">
+					<div class="rezgo-calendar-header-empty">&nbsp;</div>
+					<div class="rezgo-calendar cross-sell_add-border">
+						<div class="responsive-calendar cross-sell_add-border" id="rezgo-calendar">
+							<div class="controls">
+								<a class="float-start" data-go="prev"><div class="fas fa-angle-left fa-lg"></div></a>
+								<h4><span><span data-head-year></span> <span data-head-month></span></span></h4>
+								<a class="float-end" data-go="next"><div class="fas fa-angle-right fa-lg"></div></a>
+							</div>
+							<?php if ($company->start_week == 'mon') { ?>
+							<div class="day-headers">
+								<div class="day header">Mon</div>
+								<div class="day header">Tue</div>
+								<div class="day header">Wed</div>
+								<div class="day header">Thu</div>
+								<div class="day header">Fri</div>
+								<div class="day header">Sat</div>
+								<div class="day header">Sun</div>
+							</div>
+							<?php } else { ?>
+							<div class="day-headers">
+								<div class="day header">Sun</div>
+								<div class="day header">Mon</div>
+								<div class="day header">Tue</div>
+								<div class="day header">Wed</div>
+								<div class="day header">Thu</div>
+								<div class="day header">Fri</div>
+								<div class="day header">Sat</div>
+							</div>
+							<?php } ?>
+							<div class="days" data-group="days"></div>
+						</div>
+						<div class="rezgo-calendar-legend">
+							<span class="available">&nbsp;</span><span class="text-available"><span>&nbsp;Available&nbsp;&nbsp;</span></span>
+							<span class="full">&nbsp;</span><span class="text-full"><span>&nbsp;Full&nbsp;&nbsp;</span></span>
+							<span class="unavailable">&nbsp;</span><span class="text-unavailable"><span>&nbsp;Unavailable</span></span>
+							<div id="rezgo-calendar-memo"></div>
+						</div>
+						<div id="rezgo-scrollto-options"></div>
+						<div class="rezgo-date-selector" style="display:none;">
+							<!-- available options will populate here -->
+							<div class="rezgo-date-options"></div>
+						</div>
+						<div id="rezgo-date-script" style="display:none;">
+							<!-- ajax script will be inserted here -->
+						</div>
+					</div>
+				</div>
+			<?php } elseif ( ($calendar_dates == 0 || $single_dates <= 10) && $open_dates == 0 ) { // single day options ?>
+				<div class="rezgo-calendar-wrp">
+					<?php $opt = 1; // pass an option counter to calendar day ?>
+
+					<?php foreach ($day_options as $option) { ?>
+						<div class="rezgo-calendar-single" id="rezgo-calendar-single-<?php echo esc_attr($opt); ?>" style="display:none;">
+  						<div class="rezgo-calendar-single-head">
+                <?php
+                $available_day = date('D', $option['start_date']);
+                $available_date = date((string) $company->date_format, $option['start_date']);
+                ?>
+                <span class="rezgo-calendar-avail">
+                  <span>Availability&nbsp;for:&nbsp;</span>
+                </span>
+                <strong><span class="rezgo-avail-day"><?php echo esc_html($available_day); ?>,&nbsp;</span><span class="rezgo-avail-date"><?php echo esc_html($available_date); ?></span></strong>
+              </div>
+
+  						<div class="rezgo-date-selector" id="rezgo-single-date-<?php echo esc_attr($opt); ?>"></div>
+						
+						  <script type="text/javascript">
+							jQuery(document).ready(function($){
+								$.ajax({
+									url: '<?php echo admin_url('admin-ajax.php'); ?>',
+										data: {
+											action: 'rezgo',
+											method: 'calendar_day',
+											parent_url: '<?php echo esc_html($site->base); ?>',
+											com: '<?php echo esc_html($item->com); ?>',
+											date: '<?php echo esc_html(date('Y-m-d', $option['start_date'])); ?>',
+											option_num: '<?php echo esc_html($opt); ?>',
+											type: 'single',
+											<?php if ($_REQUEST['view'] != 'calendar') { ?>
+											cross_sell: 1,
+											<?php } ?>
+											wp_slug: '<?php echo esc_html($wp_slug); ?>',
+											security: '<?php echo wp_create_nonce('rezgo-nonce'); ?>'
+										},
+									context: document.body,
+									success: function(data) {
+										
+										if (data.indexOf('rezgo-order-none-available') == -1) {
+											$('#rezgo-single-date-<?php echo esc_html($opt); ?>').html(data).slideDown('fast');
+											$('#rezgo-calendar-single-<?php echo esc_html($opt); ?>').fadeIn('fast');
+										}
+										
+									}
+								});
+							});
+						  </script> 
+						</div>
+						<?php $opt++; ?>
+					<?php } // end foreach ($day_options) ?> 
+					
+					<div id="rezgo-single-memo"></div>
+				</div><!-- // .rezgo-calendar-wrp -->
+			<!-- // single day booking -->
+			<?php } // end single dates > 0 ?>
+
+		</div>
+
+	</div>
+  <div class="clearfix" id="rezgo-cross-cal-bottom" >&nbsp;</div> <!-- style="height:0;" -->
+ 
+	<script type="text/javascript">
+		jQuery(document).ready(function($){
+			
+			// current JS timestamp
+			var js_timestamp = Math.round(new Date().getTime()/1000);
+			
+			// function returns Y-m-d date format
+			(function() {
+					Date.prototype.toYMD = Date_toYMD;
+					function Date_toYMD() {
+							var year, month, day;
+							year = String(this.getFullYear());
+							month = String(this.getMonth() + 1);
+							if (month.length == 1) {
+									month = "0" + month;
+							}
+							day = String(this.getDate());
+
+							if (day.length == 1) {
+									day = "0" + day;
+							}
+							return year + "-" + month + "-" + day;
+					}
+			})();			
+			
+			// new Date() object for tracking months
+			var rezDate = new Date('<?php echo esc_attr($calendar_start); ?>-15');			
+			
+			function addLeadingZero(num) {
+				if (num < 10) {
+					return "0" + num;
+				} else {
+					return "" + num;
+				}
+			}
+			
+			// only animate month changes if not using Safari
+			var isSafari = Object.prototype.toString.call(window.HTMLElement).indexOf('Constructor') > 0;
+			
+			if (isSafari) {
+				monthAnimate = false;
+			} else {
+				monthAnimate = false;
+			}
+
+			$('.responsive-calendar').responsiveCalendar({
+				
+				time: '<?php echo esc_html($calendar_start); ?>', 
+				startFromSunday: <?php echo (($company->start_week == 'mon') ? 'false' : 'true') ?>,
+				allRows: false,
+				monthChangeAnimation: monthAnimate,
+									
+				onDayClick: function(events) { 
+
+					$('.days .day').each(function () {
+						$(this).removeClass('select');
+					});
+					$(this).parent().addClass('select');
+					
+					var this_date, this_class;
+					
+					this_date = $(this).data('year')+'-'+ addLeadingZero($(this).data('month')) +'-'+ addLeadingZero($(this).data('day'));
+					
+					this_class = events[this_date].class;
+					
+					if (this_class == 'passed') {
+						//$('.rezgo-date-selector').html('<p class="lead">This day has passed.</p>').show();
+					} else if (this_class == 'cutoff') {
+						//$('.rezgo-date-selector').html('<p class="lead">Inside the cut-off.</p>').show();
+					} else if (this_class == 'unavailable') {
+						//$('.rezgo-date-selector').html('<p class="lead">No tours available on this day.</p>').show();
+					} else if (this_class == 'full') {
+						//$('.rezgo-date-selector').html('<p class="lead">This day is fully booked.</p>').show();
+						
+					} else {
+													
+						$('.rezgo-date-options').html('<div class="rezgo-date-loading"></div>');
+						
+						if($('.rezgo-date-selector').css('display') == 'none') {
+							$('.rezgo-date-selector').slideDown('fast');
+						}
+					
+						$('.rezgo-date-selector').css('opacity', '0.4');
+						
+						$.ajax({
+							url: '<?php echo admin_url('admin-ajax.php'); ?>',
+							data: {
+								action: 'rezgo',
+								method: 'calendar_day',
+								parent_url: '<?php echo esc_html($site->base); ?>',
+								com: '<?php echo esc_html($item->com); ?>',
+								date: this_date,
+								type: 'calendar',
+								js_timestamp: js_timestamp,
+								date_format: '<?php echo esc_html($date_format); ?>',
+								time_format: '<?php echo esc_html($time_format); ?>',
+								<?php if ($_REQUEST['view'] != 'calendar') { ?>
+								cross_sell: 1,
+								<?php } ?>
+								wp_slug: '<?php echo esc_html($wp_slug); ?>', 
+								security: '<?php echo wp_create_nonce('rezgo-nonce'); ?>'
+							},
+							context: document.body,
+							success: function(data) {
+								
+								$('.rezgo-date-selector').html(data).css('opacity', '1');
+								$('.rezgo-date-options').show();
+
+							}
+						});
+						
+					}
+				
+				},
+									
+				onActiveDayClick: function(events) { 
+				
+					$('.days .day').each(function () {
+						$(this).removeClass('select');
+					});
+					
+					$(this).parent().addClass('select');
+				
+				},
+				
+				onMonthChange: function(events) { 
+				
+					// first hide any options below ...
+					// $('.rezgo-date-selector').slideUp('slow');
+					
+					/*rezDate.setMonth(rezDate.getMonth() + 1);
+					var rezNewMonth = rezDate.toYMD();*/
+					
+					var newMonth = this.currentYear + '-' + addLeadingZero(this.currentMonth + 1) + '-15';
+							
+					$.ajax({
+						url: '<?php echo admin_url('admin-ajax.php'); ?>',
+						data: {
+							action: 'rezgo',
+							method: 'calendar_month',
+							uid: '<?php echo esc_html($item->uid); ?>',
+							com: '<?php echo esc_html($item->com); ?>',
+							date: newMonth,
+							security: '<?php echo wp_create_nonce('rezgo-nonce'); ?>'
+						},
+						context: document.body,
+						success: function(data) {
+							$('#rezgo-date-script').html(data); 
+						}
+					});
+				
+				},
+				
+				events: {
+					<?php echo $calendar_events; ?>		
+				}
+					
+			});			
+			
+			<?php if ( ( $calendar_dates > 0 || $single_dates > 10 ) && $cal_day_set === TRUE ) { ?>
+			// open the first available day			
+			$('.rezgo-date-options').html('<div class="rezgo-date-loading"></div>');
+			
+			if($('.rezgo-date-selector').css('display') == 'none') {
+				$('.rezgo-date-selector').slideDown('fast');
+			}
+			
+			$.ajax({
+				url: '<?php echo admin_url('admin-ajax.php'); ?>',
+					data: {
+						action: 'rezgo',
+						method: 'calendar_day',
+						parent_url: '<?php echo esc_html($site->base); ?>',
+						com: '<?php echo esc_html($item->com); ?>',
+						date: '<?php echo esc_html($open_cal_day); ?>',
+						id: '<?php echo esc_html($option); ?>',
+						type: 'calendar',
+						js_timestamp: js_timestamp,
+						date_format: '<?php echo esc_html($date_format); ?>',
+						time_format: '<?php echo esc_html($time_format); ?>',
+						<?php if ($_REQUEST['view'] != 'calendar') { ?>
+						cross_sell: 1,
+						<?php } ?>
+						wp_slug: '<?php echo esc_attr($wp_slug); ?>',
+						security: '<?php echo wp_create_nonce('rezgo-nonce'); ?>'
+					},
+				context: document.body,
+				success: function(data) {
+					$('.rezgo-date-selector').html(data).css('opacity', '1');
+					$('.rezgo-date-options').show();
+					$('.active [data-day="<?php echo esc_html($start_day); ?>"]').parent().addClass('select');			
+					
+				}
+			});
+			// end open first day
+			<?php } ?>		
+			
+			if ($(document).width() <= 762) {
+				$('html, body').animate({
+						scrollTop: ($('#rezgo-cross-cal-top').offset().top)
+				},500);		
+			}
+								
+		});
+		
+	</script>
+<?php } ?>
+</div>
